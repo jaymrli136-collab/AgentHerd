@@ -81,8 +81,9 @@ The Herder may add, never rewrite.
   ```
 
 - If the Herder cannot tell which task the owner means, it asks with buttons. It does not guess.
-- Projects: the Herder finds folders with `project_find` and the owner always picks one with a
-  button; `session_start` runs only in a folder the owner typed or picked in that message
+- Projects: the Herder finds names with `project_find` and the owner picks with a button; a folder
+  the owner names by absolute path is checked exactly instead of searched by name. `session_start`
+  runs only in a folder the owner typed or picked in that message
   ([ADR 0035](../adr/0035-herder-finds-projects-owner-picks.md), spec 08 §1).
 
 ### Relay
@@ -106,7 +107,7 @@ The Herder may add, never rewrite.
 | Group | Tools |
 | --- | --- |
 | Sessions | `session_start(project, name, profile?, ownerText, addedContext, model?)` (GPT models run in Codex, the rest in Pi, [ADR 0031](../adr/0031-pick-the-agent-from-the-model.md); `hard?` sends a hard coding task to Claude Code when it is installed and an Anthropic-style model fits, [ADR 0069](../adr/0069-claude-code-the-owners-own-or-downloaded.md)) (name: the task's short name, shown on the board and every report, [ADR 0034](../adr/0034-herder-names-tasks.md)) (model: `service/model` the agent can run, picked by the Herder, [ADR 0025](../adr/0025-herder-picks-model-per-task.md)), `session_prompt(sessionId, text, name?)` (name renames the task), `session_cancel(sessionId)` (stops the running turn), `session_end(sessionId)` (closes the task when the owner says it is finished), `session_list()` (also lists models, the agents that can run each, and the owner's model guide, [ADR 0026](../adr/0026-model-guide-for-the-herder.md)) |
-| Owner | `ask(text, options)` (AgentHerd adds 「其他」), `project_find(name)`, `notify(text)`, `relay_start(sessionId)`, `relay_end()`, `task_search(query)` (earlier tasks by title, project and last report; up to 10, [ADR 0054](../adr/0054-say-what-matters.md)), `task_read(task, replies?)` (a task's latest reply, or its last 5, whole and quoted; at most 40,000 characters, [ADR 0062](../adr/0062-restarts-lose-nothing-and-wake-ups-stop-at-three.md)), `notice_level(kind, level)` (where one kind of small news goes: push, board or off, [ADR 0061](../adr/0061-small-news-on-the-board.md)) |
+| Owner | `ask(text, options)` (AgentHerd adds 「其他」), `project_find(name-or-path)` (a name searches under the owner's home; an absolute or `~/` path is checked exactly), `notify(text)`, `relay_start(sessionId)`, `relay_end()`, `task_search(query)` (earlier tasks by title, project and last report; up to 10, [ADR 0054](../adr/0054-say-what-matters.md)), `task_read(task, replies?)` (a task's latest reply, or its last 5, whole and quoted; at most 40,000 characters, [ADR 0062](../adr/0062-restarts-lose-nothing-and-wake-ups-stop-at-three.md)), `notice_level(kind, level)` (where one kind of small news goes: push, board or off, [ADR 0061](../adr/0061-small-news-on-the-board.md)) |
 | Read | `task_get`, `task_list`, `session_transcript`, `decisions_list`, `read`, `grep`, `list`, `git_log`, `git_diff` (read tools only inside known project directories) |
 | Schedules | `schedule_add(about, prompt, kind, at?, days?, hours?)`, `schedule_change(schedule, …, paused?)`, `schedule_remove(schedule)`: what the Herder does at set times, only when the owner asks ([ADR 0055](../adr/0055-schedules-the-herder-makes.md)) |
 | Context | `compress`, `decompress`, `search_context`, `acp_status`: fold finished parts of its own conversation, find and show them again ([ADR 0045](../adr/0045-herder-context-folded-by-the-model.md)) |
@@ -426,7 +427,7 @@ New GitHub work is offered only when the owner asks for it ([ADR 0052](../adr/00
   likes, saves and new followers are never told. `social_watch` turns this off or on when the
   owner asks; `session_list` shows platforms. Agents use the account through `XIAOHONGSHU_` and
   `ZHIHU_` tools; writes ask (ADR 0056).
-- **News and this Mac's tools** (ADR 0059, ADR 0076, ADR 0077). `feed_read` reads GitHub Trending, Hacker News or
+- **News and this machine's tools** (ADR 0059, ADR 0076, ADR 0077). `feed_read` reads GitHub Trending, Hacker News or
   arXiv; with `told: true` (a digest, often a schedule) the items are recorded and later reads
   mark them `[told before]`, which the Herder leaves out. `stock_quote` reads live stock and index
   quotes when 腾讯自选股 is enabled. `fund_holdings` reads personal 雪球基金 holdings and recent N-day

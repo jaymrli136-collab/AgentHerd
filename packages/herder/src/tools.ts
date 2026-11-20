@@ -155,12 +155,45 @@ export function resolveProject(host: HerderHost, project: string): string {
   );
 }
 
-function isDirectory(path: string): boolean {
+type DirectoryStatus =
+  | { kind: "directory" }
+  | { kind: "missing" }
+  | { kind: "not-directory" }
+  | { kind: "unknown"; code: string };
+
+function directoryStatus(path: string): DirectoryStatus {
   try {
-    return statSync(path).isDirectory();
-  } catch {
-    return false;
+    return statSync(path).isDirectory() ? { kind: "directory" } : { kind: "not-directory" };
+  } catch (error) {
+    const code = (error as NodeJS.ErrnoException).code ?? "unknown";
+    return code === "ENOENT" || code === "ENOTDIR"
+      ? { kind: "missing" }
+      : { kind: "unknown", code };
   }
+}
+
+function isDirectory(path: string): boolean {
+  return directoryStatus(path).kind === "directory";
+}
+
+/** What to tell the Herder when the owner gave an exact path instead of a project name. */
+function namedPathText(path: string, status: DirectoryStatus): string {
+  if (status.kind === "directory") {
+    return [
+      `The owner named this existing directory: ${path}`,
+      "Use this exact path for session_start. Do not search under the home folder for its name.",
+    ].join("\n");
+  }
+  if (status.kind === "missing") {
+    return `No directory exists at "${path}". Tell the owner this exact path was not found on this machine.`;
+  }
+  if (status.kind === "not-directory") {
+    return `"${path}" is not a directory. Tell the owner that exact path points to something else.`;
+  }
+  return [
+    `Could not check "${path}" (${status.code}).`,
+    "Tell the owner the path could not be verified and ask them to check it. Do not say it does not exist.",
+  ].join("\n");
 }
 
 function oneTask(host: HerderHost, query: string): Task {
@@ -618,7 +651,10 @@ const askSchema = obj({
 });
 const notifySchema = obj({ text: str() });
 const findSchema = obj({
-  name: str({ description: "The project's name as the owner said it, e.g. pi-desktop" }),
+  name: str({
+    description:
+      "The project's name as the owner said it, e.g. pi-desktop, or an absolute/~/ folder path. Pass a path exactly.",
+  }),
 });
 const emptySchema = obj({});
 const mailWatchSchema = obj({
@@ -1062,19 +1098,29 @@ export function herderTools(
       name: "project_find",
       label: "Find a project",
       description:
-        "Finds project folders (git repositories under the owner's home) by name. One project with the name the owner used: start there. Otherwise ask the owner to pick; never pick yourself.",
+        "Finds project folders by name under the owner's home, or checks an absolute/~/ path the owner named. A named path is checked exactly and need not be a git repository. One project with the name the owner used: start there. Otherwise ask the owner to pick; never pick yourself.",
       parameters: findSchema,
       execute: async (_id: string, args: { name: string }) => {
-        const found = findProjects(host.userHome, args.name);
         const t = turn();
+        const requested = args.name.trim();
+        const namedPath = resolveDirPath(requested, host.userHome);
+        if (namedPath !== undefined) {
+          if (t.kind === "event" || !t.pickedDirs.some((dir) => samePath(dir, namedPath))) {
+            return ok(
+              `"${namedPath}" is a path, but the owner did not give it in this turn. Do not use it; ask the owner to pick a folder.`,
+            );
+          }
+          return ok(namedPathText(namedPath, directoryStatus(namedPath)));
+        }
+        const found = findProjects(host.userHome, requested);
         const only = found.exact.length === 1 ? found.exact[0] : undefined;
         // Only a name the owner typed this turn picks a folder by itself (ADR 0043).
         const unique =
-          only !== undefined && t.kind !== "event" && namedBy(t.typedText, args.name)
+          only !== undefined && t.kind !== "event" && namedBy(t.typedText, requested)
             ? only
             : undefined;
         if (unique !== undefined) t.pickedDirs.push(unique);
-        return ok(foundText(args.name, found, unique));
+        return ok(foundText(requested, found, unique));
       },
     },
     {

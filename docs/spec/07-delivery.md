@@ -58,6 +58,7 @@ Each milestone is split into plans under [`plans/`](../../plans/README.md).
 | E2E-WATCHDOG | The same tool call three times in one turn tells the owner; an agent crash ends the task as `failed` with a report | M2 | `packages/core/test/e2e/follow.e2e.test.ts` |
 | E2E-STATUS | The owner sends `status`; the board is sent again and pinned; a non-owner gets nothing | M2 | `packages/core/test/e2e/follow.e2e.test.ts` |
 | E2E-RUN-FROM-CHAT | A direct message starts a session; the agent receives the owner's text verbatim plus a labeled context block; a completion report is sent | M2 | `packages/herder/test/e2e/herder.e2e.test.ts` |
+| E2E-HERDER-PROJECT-PATH | The owner gives a project folder by absolute path outside the home search; the Herder checks that exact directory, including a non-Git folder, and starts there without searching for its last name or describing another OS | M2 | `packages/herder/test/tools.test.ts`, `packages/herder/test/e2e/herder.e2e.test.ts` |
 | E2E-RELAY | Owner starts a relay; messages reach the session without the Herder; `/end` and `relayIdleMinutes` end it | M2 | `packages/core/test/e2e/relay.e2e.test.ts` |
 | E2E-BOARD | A stage change updates the pinned board in place; no new message is sent | M2 | `packages/core/test/e2e/follow.e2e.test.ts` |
 | E2E-REPORT-RELAY | Feishu done reports have no relay button; blocked, failed and stopped reports keep it. Replying to a report still reaches the task. | M2 | `packages/channel-feishu/test/card-report.test.ts`, `packages/core/test/e2e/notify.e2e.test.ts` |

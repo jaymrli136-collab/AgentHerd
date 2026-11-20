@@ -1,9 +1,9 @@
 // E2E scenarios for plan 009: the Herder with a scripted model, a real Herd, a real mock agent
 // speaking ACP, and the fake channel playing the owner.
 
-import { mkdtempSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { FakeChannel } from "@agentherd/channel-fake";
 import { Herd, Store } from "@agentherd/core";
@@ -151,6 +151,36 @@ describe("E2E-RUN-FROM-CHAT", () => {
     await herder.idle();
     expect(herd.tasks()).toHaveLength(1);
     expect(texts(channel)).toEqual(["开始了"]);
+  });
+
+  it("an exact path outside home starts there without a name search", async () => {
+    const { channel, herd, herder, faux } = await setup(ONE_TURN);
+    const project = join(dir, `project-${Math.random().toString(36).slice(2)}`);
+    mkdirSync(project, { recursive: true });
+    const ask = `在 ${project} 里写一份 notes`;
+    faux.setResponses([
+      fauxAssistantMessage([fauxToolCall("project_find", { name: project })], {
+        stopReason: "toolUse",
+      }),
+      fauxAssistantMessage(
+        [
+          fauxToolCall("session_start", {
+            name: "写 notes",
+            project,
+            ownerText: ask,
+          }),
+        ],
+        { stopReason: "toolUse" },
+      ),
+      fauxAssistantMessage("开始了"),
+      fauxAssistantMessage("notes 写好了"),
+    ]);
+    await channel.say(ask);
+    await until(() => reports(channel).length === 1);
+    await herder.idle();
+    expect(herd.tasks()).toHaveLength(1);
+    expect(herd.tasks()[0]?.project).toBe(basename(project));
+    expect(texts(channel)).toContain("开始了");
   });
 
   it("without a model, plain messages still get the commands", async () => {

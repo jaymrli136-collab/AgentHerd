@@ -4,12 +4,19 @@ import { join, resolve } from "node:path";
 import { DEFAULT_NOTICE_LEVELS, type IntakeWatch, type Schedule, Store } from "@agentherd/core";
 import { describe, expect, it } from "vitest";
 import { placeModels, type TierPlacement } from "../src/model-guide.ts";
-import { CONTEXT_LABEL, composeTaskPrompt, OWNER_LABEL, quoteAgent } from "../src/prompt.ts";
+import {
+  CONTEXT_LABEL,
+  composeTaskPrompt,
+  OWNER_LABEL,
+  quoteAgent,
+  systemPrompt,
+} from "../src/prompt.ts";
 import {
   findTasks,
   herderTools,
   isVerbatim,
   namedBy,
+  pathsIn,
   resolveProject,
   searchTasks,
   TASK_READ_CHARS_MAX,
@@ -321,9 +328,14 @@ describe("tools", () => {
   });
 
   it("systemPrompt allows any agent (including Pi) to use apps and platforms", async () => {
-    const { systemPrompt } = await import("../src/prompt.ts");
     expect(systemPrompt("zh-CN")).not.toContain("other than Pi");
     expect(systemPrompt("en")).not.toContain("other than Pi");
+  });
+
+  it("systemPrompt does not assume a macOS host", () => {
+    const prompt = systemPrompt("zh-CN");
+    expect(prompt).not.toContain("Mac");
+    expect(prompt).toContain("absolute or ~/ path");
   });
 
   it("session_list shows the models and session_start passes the chosen one", async () => {
@@ -777,6 +789,43 @@ describe("projects without asking (ADR 0043)", () => {
     await expect(
       call("session_start", { name: "看", project: dir, ownerText: "看" }),
     ).rejects.toThrow(/did not pick/);
+  });
+
+  it("checks an exact path the owner named without searching the home folder", async () => {
+    const userHome = home();
+    const project = mkdtempSync(join(tmpdir(), "ah-project-"));
+    const ownerText = `在 ${project} 里工作`;
+    const pickedDirs = pathsIn(ownerText, userHome);
+    const { call, rec } = tools({ typedText: ownerText, ownerText, pickedDirs }, { userHome });
+    const found = await call("project_find", { name: project });
+    expect(found).toContain("The owner named this existing directory");
+    expect(found).toContain(project);
+    await call("session_start", {
+      name: "在项目里工作",
+      project,
+      ownerText: "工作",
+    });
+    expect(rec.started[0]?.cwd).toBe(resolve(project));
+  });
+
+  it("does not turn a missing exact path into a home-folder name search", async () => {
+    const missing = join(tmpdir(), `ah-missing-${Date.now()}`);
+    const ownerText = `看看 ${missing}`;
+    const { call } = tools({
+      typedText: ownerText,
+      ownerText,
+      pickedDirs: pathsIn(ownerText, tmpdir()),
+    });
+    const found = await call("project_find", { name: missing });
+    expect(found).toContain(`No directory exists at "${missing}"`);
+    expect(found).not.toContain("No project named");
+  });
+
+  it("does not use a path the owner did not give in this turn", async () => {
+    const project = mkdtempSync(join(tmpdir(), "ah-project-"));
+    const { call } = tools({ pickedDirs: [] });
+    const found = await call("project_find", { name: project });
+    expect(found).toContain("the owner did not give it in this turn");
   });
 
   it("work without a project starts in a folder of its own", async () => {

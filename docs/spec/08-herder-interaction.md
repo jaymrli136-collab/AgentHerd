@@ -21,6 +21,10 @@ Rules:
   `OneDrive`, `$Recycle.Bin`, `System Volume Information`, `Saved Games`, `Contacts`, `Searches`,
   `Links`; depth 4; result cached 60 s, case-insensitive on Windows). Matching is
   case-, `-`/`_`- and space-insensitive, stripping `/` and `\` prefixes.
+- When the owner gives an absolute path or `~/…` (`~\…`) instead, `project_find` checks that exact
+  directory. It does not search by its last name, does not require a Git repository, and never
+  treats a failed home search as proof that the path is missing. Unreadable paths are reported as
+  unverified, not missing.
 - One exact match whose name is in the owner's own words this turn: the Herder starts there
   without asking (ADR 0043); `project_find` adds it to `TurnContext.pickedDirs`. Otherwise the
   Herder lets the owner pick with buttons. The owner never has to type a path, except after 「其他」.
